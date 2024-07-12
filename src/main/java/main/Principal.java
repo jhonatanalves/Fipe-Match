@@ -7,6 +7,7 @@ import service.ConverterDados;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 //https://deividfortuna.github.io/fipe/v2/
 //https://github.com/parallelum/fipe-go
@@ -54,7 +55,7 @@ public class Principal {
         marcas.forEach(t -> System.out.println(t.nome()));
 
         ListaModelosVeiculos modelos = consultarModelos(marcas, urlCategoria);
-        if(modelos == null){
+        if (modelos == null) {
             System.err.println("Marca inválida");
             return;
         }
@@ -62,38 +63,32 @@ public class Principal {
         modelos.modelos().stream().forEach(t -> System.out.println(t.nome()));
 
         List<Veiculo> veiculos = consultarVeiculos(modelos);
-        if(veiculos == null){
+        if (veiculos == null) {
             System.err.println("Modelo inválido");
             return;
         }
         System.out.printf("Veículos do modelo %s%n", modeloSelecionado);
         veiculos.stream().forEach(t -> System.out.println(t.nome()));
 
-        SumarioVeiculo sumarioVeiculo = selecionarVeiculo(veiculos);
-        if(sumarioVeiculo == null){
-            System.err.println("Veículo inválido");
-            return;
+        System.out.println("Quais informações deseja exibir? \n1 para todos os veículos \n2 para um veículo em particular?");
+        var resposta = leitura.nextLine();
+        if(resposta.equals("1")){
+            List<SumarioVeiculo> sumarioVeiculos = selecionarTodosVeiculos(veiculos);
+            System.out.printf("Dados gerais para todos os veículos do modelo %s%n", modeloSelecionado);
+            sumarioVeiculos.stream().forEach(t-> {
+                System.out.println(t.toString());
+                System.out.println("----------------------------------");
+            });
+        }else{
+            SumarioVeiculo sumarioVeiculo = selecionarVeiculo(veiculos);
+            if (sumarioVeiculo == null) {
+                System.err.println("Veículo inválido");
+                return;
+            }
+            System.out.printf("Dados gerais do modelo %s/%s%n", modeloSelecionado, veiculoSelecionado);
+            System.out.println(sumarioVeiculo.toString());
         }
-        System.out.printf("Dados gerais do modelo %s - %s%n",modeloSelecionado,veiculoSelecionado);
-        var sumario = """
-                Valor: %s,
-                Marca: %s,
-                Modelo: %s,
-                Ano Modelo: %d,
-                Combustível: %s,
-                Código Fipe: %s,
-                Mês Referência: %s,
-                Sigla Combustível: %c""";
-        var mensagemFormatada = String.format(sumario,
-                sumarioVeiculo.Valor(),
-                sumarioVeiculo.Marca(),
-                sumarioVeiculo.Modelo(),
-                sumarioVeiculo.AnoModelo(),
-                sumarioVeiculo.Combustivel(),
-                sumarioVeiculo.CodigoFipe(),
-                sumarioVeiculo.MesReferencia(),
-                sumarioVeiculo.SiglaCombustivel());
-        System.out.println(mensagemFormatada);
+
     }
 
     private String escolherCategoria() {
@@ -144,17 +139,15 @@ public class Principal {
 
         if (marcaEncontrada.isPresent()) {
             urlCorrente = URL_CATEGORIA + marcaEncontrada.get().codigo() + "/modelos";
-            System.out.println(urlCorrente);
             marcaSelecionada = marcaEncontrada.get().nome();
             var jasonModelos = consumirAPI.obterDados(urlCorrente);
-            System.out.println(jasonModelos);
             modelos = converterDados.obterModelos(jasonModelos, ListaModelosVeiculos.class);
         }
 
         return modelos;
     }
 
-    public List<Veiculo> consultarVeiculos(ListaModelosVeiculos listaModelosVeiculos){
+    public List<Veiculo> consultarVeiculos(ListaModelosVeiculos listaModelosVeiculos) {
 
         System.out.println("Digite o modelo desejado:");
         final var modeloDesejado = leitura.nextLine();
@@ -166,7 +159,7 @@ public class Principal {
         List<Veiculo> listaVeiculo = null;
 
         if (modeloEncontrado.isPresent()) {
-            urlCorrente = urlCorrente +  "/" + modeloEncontrado.get().codigo() + "/anos";
+            urlCorrente = urlCorrente + "/" + modeloEncontrado.get().codigo() + "/anos";
             modeloSelecionado = modeloEncontrado.get().nome();
             var jsonVeiculos = consumirAPI.obterDados(urlCorrente);
             listaVeiculo = converterDados.obterlista(jsonVeiculos, Veiculo.class);
@@ -175,7 +168,7 @@ public class Principal {
         return listaVeiculo;
     }
 
-    public SumarioVeiculo selecionarVeiculo(List<Veiculo> listaVeiculo){
+    public SumarioVeiculo selecionarVeiculo(List<Veiculo> listaVeiculo) {
 
         System.out.println("Digite o veículo desejado:");
         final var veiculoDesejado = leitura.nextLine();
@@ -193,6 +186,18 @@ public class Principal {
         }
 
         return sumarioVeiculo;
+    }
+
+    public  List<SumarioVeiculo> selecionarTodosVeiculos(List<Veiculo> listaVeiculo) {
+
+        urlCorrente = urlCorrente + "/";
+        List<SumarioVeiculo> sumarios = listaVeiculo.stream().map(t -> {
+            var urlCorrenteVeiculo = urlCorrente + t.codigo();
+            var jasonVeiculo = consumirAPI.obterDados(urlCorrenteVeiculo);
+            return converterDados.obterDados(jasonVeiculo, SumarioVeiculo.class);
+        }).collect(Collectors.toList());;
+
+       return sumarios;
     }
 
 }
